@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BelajarYuk - Platform Belajar Online Terpadu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0D0D0D;
+            --primary-accent: #00F2DE;
+            --secondary-accent: #9f7aea;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: #e5e7eb; overscroll-behavior: none; }
+        #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.5; }
+        .content-wrapper { position: relative; z-index: 2; }
+        .glass-card { background: rgba(17, 24, 39, 0.5); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .glass-card:hover { transform: translateY(-8px); box-shadow: 0 0 30px rgba(0, 242, 222, 0.2), 0 0 15px rgba(0, 242, 222, 0.1); }
+        .gradient-text { background: linear-gradient(90deg, var(--primary-accent), #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .spotlight-text { color: var(--primary-accent); }
+        .primary-button { background-color: var(--primary-accent); color: #0D0D0D; transition: all 0.3s ease; }
+        .primary-button:hover { transform: scale(1.05); box-shadow: 0 0 25px rgba(0, 242, 222, 0.5); }
+        .ai-label { background: linear-gradient(90deg, var(--secondary-accent), #60a5fa); font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 9999px; color: white; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-in-out forwards; opacity: 0; }
+        @keyframes fadeIn { to { opacity: 1; } }
+        .animate-slide-in-bottom { animation: slideInBottom 0.7s ease-out forwards; opacity: 0; }
+        @keyframes slideInBottom { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .article-prose h3 { font-size: 1.5rem; font-weight: 700; color: white; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+        .article-prose p { margin-bottom: 1rem; }
+        .article-prose ul { list-style-type: disc; list-style-position: inside; margin-bottom: 1rem; padding-left: 1rem; }
+        .article-prose li { margin-bottom: 0.5rem; }
+        .loader { width: 48px; height: 48px; border: 5px solid #FFF; border-bottom-color: var(--primary-accent); border-radius: 50%; display: inline-block; box-sizing: border-box; animation: rotation 1s linear infinite; }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #chatbot-toggle { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 242, 222, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(0, 242, 222, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 242, 222, 0); } }
+        .typing-indicator span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #9ca3af; margin: 0 2px; animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; } .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+        .video-container::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 1.25rem; border: 2px solid transparent;
+            background: linear-gradient(120deg, var(--primary-accent), var(--secondary-accent), var(--primary-accent)) border-box;
+            -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: destination-out; mask-composite: exclude;
+            animation: spin 4s linear infinite; z-index: -1;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .partner-logo { filter: grayscale(100%) brightness(1.5); opacity: 0.7; transition: all 0.3s ease; }
+        .partner-logo:hover { filter: grayscale(0%) brightness(1); opacity: 1; transform: scale(1.1); }
+    </style>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+    <div class="content-wrapper">
+        <!-- Header -->
+        <header class="bg-black/30 backdrop-blur-sm sticky top-0 z-50">
+            <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+                <a href="#" id="header-logo" class="text-2xl font-bold text-white">Belajar<span class="gradient-text">Yuk</span></a>
+                <nav id="main-nav" class="hidden md:flex space-x-8 items-center text-sm">
+                    <a href="#fitur" class="text-gray-300 hover:text-white">Fitur</a>
+                    <a href="#kursus" class="text-gray-300 hover:text-white">Kursus</a>
+                    <a href="#testimoni" class="text-gray-300 hover:text-white">Testimoni</a>
+                </nav>
+                <div id="auth-buttons" class="hidden md:flex items-center space-x-4">
+                    <button id="login-btn" class="text-white hover:text-cyan-300 font-medium">Masuk</button>
+                    <button id="register-btn" class="primary-button font-semibold px-5 py-2 rounded-lg">Mulai Belajar</button>
+                </div>
+                <div id="user-info" class="hidden items-center space-x-4">
+                    <span id="welcome-message" class="text-white hidden sm:block"></span>
+                    <button id="logout-btn" class="border border-red-500 text-red-400 hover:bg-red-500/10 font-semibold px-5 py-2 rounded-lg text-sm">Logout</button>
+                </div>
+                <button id="menu-button" class="md:hidden text-white"><i data-lucide="menu" class="w-6 h-6"></i></button>
+            </div>
+        </header>
+
+        <!-- LANDING PAGE VIEW -->
+        <div id="landing-page-view">
+            <main>
+                 <section class="py-20 md:py-24 text-center">
+                    <div class="container mx-auto px-6">
+                        <h1 class="text-4xl md:text-6xl font-extrabold text-white leading-tight mb-4 animate-slide-in-bottom" style="animation-delay: 0.1s;">Wujudkan Karir Impian di Era <span class="spotlight-text">Digital</span></h1>
+                        <p class="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto mb-10 animate-slide-in-bottom" style="animation-delay: 0.3s;">Jadilah bagian dari revolusi teknologi dengan kurikulum relevan, mentor ahli, dan sertifikasi yang diakui industri.</p>
+                        <a href="#kursus" class="primary-button text-lg font-bold px-8 py-4 rounded-lg inline-block mb-16 animate-slide-in-bottom" style="animation-delay: 0.5s;">Jelajahi Semua Kursus</a>
+                        
+                        <div class="relative max-w-4xl mx-auto video-container">
+                             <div class="rounded-2xl overflow-hidden shadow-2xl shadow-cyan-500/10">
+                                <!-- GANTI DARI IFRAME KE VIDEO -->
+                                <video class="w-full aspect-video" src="https://frappe.io/files/frappe%20learn.mp4" autoplay muted loop controls playsinline>
+                                    Browser Anda tidak mendukung tag video.
+                                </video>
+                                <!-- AKHIR PERUBAHAN -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section id="fitur" class="py-20">
+                    <div class="container mx-auto px-6">
+                        <h2 class="text-3xl md:text-4xl font-bold text-center text-white mb-4">Kenapa Belajar<span class="gradient-text">Yuk</span>?</h2>
+                        <p class="text-center text-gray-400 max-w-2xl mx-auto mb-12">Platform kami dirancang dengan teknologi terkini untuk memberi Anda keunggulan.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <!-- Fitur 1 -->
+                            <div class="glass-card p-8 text-center animate-fade-in" style="animation-delay: 100ms;">
+                                <i data-lucide="brain-circuit" class="w-12 h-12 text-cyan-400 mx-auto mb-4"></i>
+                                <h4 class="text-2xl font-bold text-white mb-3">Materi Buatan AI</h4>
+                                <p class="text-gray-400 text-sm">Konten pembelajaran yang dinamis dan relevan, dibuat oleh AI dan divalidasi oleh pakar industri.</p>
+                            </div>
+                            <!-- Fitur 2 -->
+                            <div class="glass-card p-8 text-center animate-fade-in" style="animation-delay: 200ms;">
+                                <i data-lucide="message-circle" class="w-12 h-12 text-cyan-400 mx-auto mb-4"></i>
+                                <h4 class="text-2xl font-bold text-white mb-3">Asisten AI 24/7</h4>
+                                <p class="text-gray-400 text-sm">Chatbot cerdas kami siap membantu menjawab pertanyaan Anda kapan saja, memastikan Anda tidak pernah buntu.</p>
+                            </div>
+                            <!-- Fitur 3 -->
+                            <div class="glass-card p-8 text-center animate-fade-in" style="animation-delay: 300ms;">
+                                <i data-lucide="award" class="w-12 h-12 text-cyan-400 mx-auto mb-4"></i>
+                                <h4 class="text-2xl font-bold text-white mb-3">Sertifikasi Terverifikasi</h4>
+                                <p class="text-gray-400 text-sm">Dapatkan sertifikat yang diakui industri setelah menyelesaikan kursus untuk meningkatkan portofolio karir Anda.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section id="kursus" class="py-20 bg-black/20">
+                    <div class="container mx-auto px-6">
+                        <h2 class="text-3xl md:text-4xl font-bold text-center text-white mb-4">Kursus <span class="gradient-text">Unggulan</span></h2>
+                        <p class="text-center text-gray-400 max-w-2xl mx-auto mb-12">Mulai perjalanan Anda dengan topik paling populer yang kami tawarkan saat ini.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <!-- Kursus 1 -->
+                            <div class="glass-card rounded-2xl flex flex-col overflow-hidden p-6">
+                                <span class="text-sm font-semibold text-purple-400 mb-3">Kecerdasan Buatan</span>
+                                <h3 class="text-xl font-bold text-white mb-2 flex-grow">Pengenalan Model Bahasa Besar (LLM)</h3>
+                                <p class="text-gray-400 text-sm mb-4">Pelajari cara kerja model AI canggih seperti GPT dan bagaimana mereka memahami serta menghasilkan teks...</p>
+                                <button class="learn-more-btn mt-auto w-full text-center bg-gray-700/50 hover:bg-cyan-600 hover:text-black text-white font-semibold py-2 rounded-lg text-sm">Pelajari Lebih Lanjut</button>
+                            </div>
+                            <!-- Kursus 2 -->
+                            <div class="glass-card rounded-2xl flex flex-col overflow-hidden p-6">
+                                <span class="text-sm font-semibold text-blue-400 mb-3">Keuangan</span>
+                                <h3 class="text-xl font-bold text-white mb-2 flex-grow">Dasar-dasar Investasi Saham</h3>
+                                <p class="text-gray-400 text-sm mb-4">Panduan untuk pemula dalam memahami pasar saham, menganalisis perusahaan, dan memulai investasi...</p>
+                                <button class="learn-more-btn mt-auto w-full text-center bg-gray-700/50 hover:bg-cyan-600 hover:text-black text-white font-semibold py-2 rounded-lg text-sm">Pelajari Lebih Lanjut</button>
+                            </div>
+                            <!-- Kursus 3 -->
+                            <div class="glass-card rounded-2xl flex flex-col overflow-hidden p-6">
+                                <span class="text-sm font-semibold text-purple-400 mb-3">Kecerdasan Buatan</span>
+                                <h3 class="text-xl font-bold text-white mb-2 flex-grow">Generative AI: Dari Teks ke Gambar</h3>
+                                <p class="text-gray-400 text-sm mb-4">Selami dunia AI yang mampu menciptakan karya seni dan gambar realistis hanya dari deskripsi teks...</p>
+                                <button class="learn-more-btn mt-auto w-full text-center bg-gray-700/50 hover:bg-cyan-600 hover:text-black text-white font-semibold py-2 rounded-lg text-sm">Pelajari Lebih Lanjut</button>
+                            </div>
+                        </div>
+                        <div class="text-center mt-12">
+                            <button id="see-all-courses-btn" class="primary-button font-semibold px-8 py-3 rounded-lg">Lihat Semua Kursus</button>
+                        </div>
+                    </div>
+                </section>
+                <section id="testimoni" class="py-20">
+                    <div class="container mx-auto px-6">
+                        <h2 class="text-3xl md:text-4xl font-bold text-center text-white mb-4">Apa Kata <span class="gradient-text">Mereka</span>?</h2>
+                        <p class="text-center text-gray-400 max-w-2xl mx-auto mb-12">Jangan hanya percaya kata kami. Dengarkan dari para pelajar kami.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            <!-- Testimoni 1 -->
+                            <div class="glass-card p-8">
+                                <i data-lucide="quote" class="w-10 h-10 text-cyan-400/30 mb-4"></i>
+                                <p class="text-lg text-gray-300 italic mb-6">"Materi AI-nya sangat relevan! Saya bisa menerapkan ilmunya langsung di pekerjaan. Chatbot asistennya juga sangat membantu."</p>
+                                <div class="flex items-center">
+                                    <img src="https://placehold.co/48x48/E2E8F0/4A5568?text=BN" alt="Andi R." class="w-12 h-12 rounded-full mr-4 border-2 border-cyan-400">
+                                    <div>
+                                        <h5 class="font-bold text-white">Bagja Nugraha</h5>
+                                        <p class="text-sm text-gray-400">Mahasiswa</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Testimoni 2 -->
+                            <div class="glass-card p-8">
+                                <i data-lucide="quote" class="w-10 h-10 text-cyan-400/30 mb-4"></i>
+                                <p class="text-lg text-gray-300 italic mb-6">"Sebagai pemula di dunia keuangan, kursus di BelajarYuk sangat mudah dipahami. Saya sekarang lebih percaya diri mengelola investasi."</p>
+                                <div class="flex items-center">
+                                    <img src="https://placehold.co/48x48/E2E8F0/4A5568?text=GM" alt="Siti" class="w-12 h-12 rounded-full mr-4 border-2 border-cyan-400">
+                                    <div>
+                                        <h5 class="font-bold text-white">Gifran Mujahidin</h5>
+                                        <p class="text-sm text-gray-400">Mahasiswa</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Testimoni 3 -->
+                            <div class="glass-card p-8">
+                                <i data-lucide="quote" class="w-10 h-10 text-cyan-400/30 mb-4"></i>
+                                <p class="text-lg text-gray-300 italic mb-6">"Platformnya keren! Desain futuristik dan materi yang 'to the point'. Belajar jadi tidak membosankan sama sekali."</p>
+                                <div class="flex items-center">
+                                    <img src="https://placehold.co/48x48/E2E8F0/4A5568?text=MR" alt="Doni" class="w-12 h-12 rounded-full mr-4 border-2 border-cyan-400">
+                                    <div>
+                                        <h5 class="font-bold text-white">Muhammad Rizky Aulia Ramadhan</h5>
+                                        <p class="text-sm text-gray-400">Mahasiswa</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section id="faq" class="py-20 bg-black/20">
+                    <div class="container mx-auto px-6 max-w-4xl">
+                        <h2 class="text-3xl md:text-4xl font-bold text-center text-white mb-4">Pertanyaan yang Sering <span class="gradient-text">Ditanyakan</span></h2>
+                        <p class="text-center text-gray-400 max-w-2xl mx-auto mb-12">Masih bingung? Kami punya jawaban untuk beberapa pertanyaan umum.</p>
+                        
+                        <div class="space-y-4">
+                            <!-- FAQ 1 -->
+                            <details class="glass-card rounded-lg overflow-hidden group">
+                                <summary class="flex justify-between items-center p-5 cursor-pointer text-lg font-semibold text-white group-hover:text-cyan-300">
+                                    Apa itu BelajarYuk?
+                                    <i data-lucide="chevron-down" class="w-5 h-5 transition-transform duration-300 group-open:rotate-180"></i>
+                                </summary>
+                                <div class="p-5 pt-0 text-gray-400 text-sm border-t border-white/10">
+                                    <p>BelajarYuk adalah platform e-learning modern yang berfokus pada keterampilan digital masa depan, khususnya Kecerdasan Buatan (AI) dan Keuangan (Finance). Kami menggunakan teknologi AI untuk membuat materi yang relevan dan asisten virtual untuk membantu Anda belajar.</p>
+                                </div>
+                            </details>
+                            <!-- FAQ 2 -->
+                            <details class="glass-card rounded-lg overflow-hidden group">
+                                <summary class="flex justify-between items-center p-5 cursor-pointer text-lg font-semibold text-white group-hover:text-cyan-300">
+                                    Siapa yang membuat materi kursus?
+                                    <i data-lucide="chevron-down" class="w-5 h-5 transition-transform duration-300 group-open:rotate-180"></i>
+                                </summary>
+                                <div class="p-5 pt-0 text-gray-400 text-sm border-t border-white/10">
+                                    <p>Materi kami dibuat menggunakan kombinasi canggih antara AI generatif terdepan dan validasi ketat oleh para pakar di bidangnya. Ini memastikan konten kami selalu *up-to-date* dan akurat secara industri.</p>
+                                </div>
+                            </details>
+                            <!-- FAQ 3 -->
+                            <details class="glass-card rounded-lg overflow-hidden group">
+                                <summary class="flex justify-between items-center p-5 cursor-pointer text-lg font-semibold text-white group-hover:text-cyan-300">
+                                    Apakah platform ini gratis?
+                                    <i data-lucide="chevron-down" class="w-5 h-5 transition-transform duration-300 group-open:rotate-180"></i>
+                                </summary>
+                                <div class="p-5 pt-0 text-gray-400 text-sm border-t border-white/10">
+                                    <p>Anda dapat mendaftar secara gratis untuk mengakses materi dasar dan mencoba asisten AI kami. Untuk akses penuh ke semua kursus lanjutan dan mendapatkan sertifikat, kami menawarkan paket langganan yang terjangkau.</p>
+                                </div>
+                            </details>
+                            <!-- FAQ 4 -->
+                            <details class="glass-card rounded-lg overflow-hidden group">
+                                <summary class="flex justify-between items-center p-5 cursor-pointer text-lg font-semibold text-white group-hover:text-cyan-300">
+                                    Apakah saya akan mendapatkan sertifikat?
+                                    <i data-lucide="chevron-down" class="w-5 h-5 transition-transform duration-300 group-open:rotate-180"></i>
+                                </summary>
+                                <div class="p-5 pt-0 text-gray-400 text-sm border-t border-white/10">
+                                    <p>Ya! Setelah berhasil menyelesaikan sebuah alur belajar (learning path) atau kursus premium, Anda akan menerima sertifikat digital terverifikasi yang dapat Anda tambahkan ke profil LinkedIn atau portofolio Anda.</p>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </section>
+            </main>
+            <footer class="bg-black/30 border-t border-white/10 mt-20">
+                <div class="container mx-auto px-6 py-12">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                        <div class="md:col-span-1">
+                            <a href="#" class="text-2xl font-bold text-white">Belajar<span class="gradient-text">Yuk</span></a>
+                            <p class="text-gray-400 mt-4 text-sm">Platform belajar online untuk masa depan karir digital Anda.</p>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-white tracking-wide">Navigasi</h4>
+                            <ul class="mt-4 space-y-2 text-sm">
+                                <li><a href="#fitur" class="text-gray-400 hover:text-cyan-300">Fitur</a></li>
+                                <li><a href="#kursus" class="text-gray-400 hover:text-cyan-300">Kursus</a></li>
+                                <li><a href="#testimoni" class="text-gray-400 hover:text-cyan-300">Testimoni</a></li>
+                            </ul>
+                        </div>
+                        <div>
+                             <h4 class="font-semibold text-white tracking-wide">Legal</h4>
+                            <ul class="mt-4 space-y-2 text-sm">
+                                <li><a href="#" class="text-gray-400 hover:text-cyan-300">Syarat & Ketentuan</a></li>
+                                <li><a href="#" class="text-gray-400 hover:text-cyan-300">Kebijakan Privasi</a></li>
+                            </ul>
+                        </div>
+                         <div>
+                            <h4 class="font-semibold text-white tracking-wide">Hubungi Kami</h4>
+                            <div class="flex space-x-4 mt-4">
+                                <a href="#" class="text-gray-400 hover:text-cyan-300"><i data-lucide="twitter"></i></a>
+                                <a href="#" class="text-gray-400 hover:text-cyan-300"><i data-lucide="instagram"></i></a>
+                                <a href="#" class="text-gray-400 hover:text-cyan-300"><i data-lucide="linkedin"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-8 pt-8 border-t border-gray-800 text-center text-gray-500 text-sm">
+                        &copy; 2025 BelajarYuk. Seluruh hak cipta dilindungi.
+                    </div>
+                </div>
+            </footer>
+        </div>
+
+        <!-- HOME/MATERI VIEW (Initially Hidden) -->
+        <div id="home-view" class="hidden">
+            <main class="container mx-auto px-6 py-12 min-h-screen">
+                <div id="main-materi-view">
+                    <h1 class="text-4xl md:text-5xl font-bold text-white mb-8 text-center">Jelajahi Materi <span class="gradient-text">Terbaru</span></h1>
+                    <div class="flex justify-center space-x-2 md:space-x-4 mb-12">
+                        <button class="filter-btn active bg-cyan-500 text-black px-4 py-2 rounded-full text-sm font-semibold" data-filter="all">Semua</button>
+                        <button class="filter-btn bg-gray-800 hover:bg-cyan-500 hover:text-black text-white px-4 py-2 rounded-full text-sm font-semibold" data-filter="AI">Kecerdasan Buatan</button>
+                        <button class="filter-btn bg-gray-800 hover:bg-cyan-500 hover:text-black text-white px-4 py-2 rounded-full text-sm font-semibold" data-filter="Finance">Keuangan</button>
+                    </div>
+                    <div id="materi-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"></div>
+                </div>
+                <div id="article-view" class="hidden animate-fade-in">
+                    <button id="back-to-main" class="flex items-center space-x-2 text-cyan-400 hover:text-cyan-300 font-semibold mb-8"><i data-lucide="arrow-left"></i><span>Kembali</span></button>
+                    <div class="glass-card rounded-2xl p-8 md:p-12">
+                        <div class="flex justify-between items-start mb-4">
+                            <span id="article-category" class="text-lg font-semibold"></span>
+                            <span class="ai-label">Dibuat oleh AI</span>
+                        </div>
+                        <h2 id="article-title" class="text-3xl md:text-4xl font-bold text-white mb-6"></h2>
+                        <div id="article-content" class="article-prose text-gray-300 leading-relaxed"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Modals, Toast, and Chatbot -->
+        <div id="modal-backdrop" class="fixed inset-0 bg-black/80 z-50 hidden"></div>
+        <div id="login-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md glass-card rounded-2xl p-8 z-[60] hidden animate-fade-in">
+            <!-- Login Form -->
+            <h2 class="text-2xl font-bold text-center text-white mb-6">Masuk ke Akun Anda</h2>
+            <form id="login-form">
+                <div class="mb-4"><input id="login-username" type="text" placeholder="Username" class="w-full bg-gray-800/80 text-white rounded-lg p-3 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500" required></div>
+                <div class="mb-6"><input id="login-password" type="password" placeholder="Password" class="w-full bg-gray-800/80 text-white rounded-lg p-3 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500" required></div>
+                <button type="submit" class="w-full primary-button font-bold py-3 rounded-lg">Masuk</button>
+            </form>
+        </div>
+        <div id="register-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md glass-card rounded-2xl p-8 z-[60] hidden animate-fade-in">
+            <!-- Register Form -->
+            <h2 class="text-2xl font-bold text-center text-white mb-6">Buat Akun Baru</h2>
+            <form id="register-form">
+                 <div class="mb-4"><input id="register-username" type="text" placeholder="Username" class="w-full bg-gray-800/80 text-white rounded-lg p-3 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500" required></div>
+                <div class="mb-6"><input id="register-password" type="password" placeholder="Password" class="w-full bg-gray-800/80 text-white rounded-lg p-3 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500" required></div>
+                <button type="submit" class="w-full primary-button font-bold py-3 rounded-lg">Daftar</button>
+            </form>
+        </div>
+        <div id="toast" class="fixed top-5 right-5 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg opacity-0 transition-all duration-300 -translate-y-12"></div>
+        <button id="chatbot-toggle" class="fixed bottom-6 right-6 primary-button w-16 h-16 rounded-full flex items-center justify-center shadow-lg z-50"><i data-lucide="message-circle" class="w-8 h-8"></i></button>
+        <div id="chatbot-window" class="hidden fixed bottom-24 right-6 w-full max-w-sm glass-card rounded-2xl shadow-2xl z-50 flex flex-col animate-fade-in" style="height: 60vh;">
+            <div class="flex items-center justify-between p-4 border-b border-white/10">
+                <h3 class="font-bold text-white">Asisten AI BelajarYuk</h3>
+                <button id="close-chatbot-btn" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="chat-body" class="flex-1 p-4 overflow-y-auto">
+                <!-- Chat messages will be appended here -->
+            </div>
+            <div id="typing-indicator" class="p-4 hidden">
+                <div class="typing-indicator"><span></span><span></span><span></span></div>
+            </div>
+            <div class="p-4 border-t border-white/10">
+                <form id="chat-form" class="flex items-center space-x-2">
+                    <input type="text" id="chat-input" placeholder="Tanya apa saja..." class="flex-1 w-full bg-gray-800/80 text-white rounded-lg p-3 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    <button type="submit" class="primary-button p-3 rounded-lg"><i data-lucide="send" class="w-5 h-5"></i></button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS AND STATE ---
+        const SESSION_KEY = 'belajarYukSession';
+        const USERS_KEY = 'belajarYukUsers';
+        // DOM Elements
+        const landingPageView = document.getElementById('landing-page-view');
+        const homeView = document.getElementById('home-view');
+        const mainMateriView = document.getElementById('main-materi-view');
+        const articleView = document.getElementById('article-view');
+        const authButtons = document.getElementById('auth-buttons');
+        const userInfo = document.getElementById('user-info');
+        const welcomeMessage = document.getElementById('welcome-message');
+        const mainNav = document.getElementById('main-nav');
+        const modalBackdrop = document.getElementById('modal-backdrop');
+        const loginModal = document.getElementById('login-modal');
+        const registerModal = document.getElementById('register-modal');
+        const loginBtn = document.getElementById('login-btn');
+        const registerBtn = document.getElementById('register-btn');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const logoutBtn = document.getElementById('logout-btn');
+        const toastEl = document.getElementById('toast');
+        const materiGrid = document.getElementById('materi-grid');
+        const chatbotToggle = document.getElementById('chatbot-toggle');
+        const chatbotWindow = document.getElementById('chatbot-window');
+        const closeChatbotBtn = document.getElementById('close-chatbot-btn');
+        const chatBody = document.getElementById('chat-body');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const typingIndicator = document.getElementById('typing-indicator');
+
+        let chatHistory = [];
+        let isChatbotOpen = false;
+
+        // --- DATA ---
+        const materiData = [
+            { id: 1, title: 'Pengenalan Model Bahasa Besar (LLM)', category: 'AI', description: 'Pelajari cara kerja model AI canggih seperti GPT dan bagaimana mereka memahami serta menghasilkan teks layaknya manusia.' },
+            { id: 2, title: 'Dasar-dasar Investasi Saham', category: 'Finance', description: 'Panduan untuk pemula dalam memahami pasar saham, menganalisis perusahaan, dan memulai investasi pertama Anda.' },
+            { id: 3, title: 'Etika dan Keamanan dalam AI', category: 'AI', description: 'Jelajahi tantangan etis, bias, dan langkah-langkah keamanan yang krusial dalam pengembangan sistem AI yang bertanggung jawab.' },
+            { id: 4, title: 'Manajemen Risiko Portofolio', category: 'Finance', description: 'Kuasai teknik diversifikasi dan strategi untuk melindungi investasi Anda dari volatilitas pasar dan kerugian tak terduga.' },
+            { id: 5, title: 'Generative AI: Dari Teks ke Gambar', category: 'AI', description: 'Selami dunia AI yang mampu menciptakan karya seni dan gambar realistis hanya dari deskripsi teks sederhana.' },
+            { id: 6, title: 'Memahami Teknologi Blockchain & Kripto', category: 'Finance', description: 'Pahami konsep dasar di balik Bitcoin, Ethereum, dan bagaimana teknologi blockchain merevolusi dunia keuangan.' },
+        ];
+
+        // --- CORE APP LOGIC ---
+        function showLandingPageView() {
+            homeView.classList.add('hidden');
+            landingPageView.classList.remove('hidden');
+            userInfo.classList.add('hidden');
+            authButtons.style.display = 'flex';
+            mainNav.classList.remove('hidden');
+        }
+
+        function showHomeView(user) {
+            landingPageView.classList.add('hidden');
+            homeView.classList.remove('hidden');
+            authButtons.style.display = 'none';
+            userInfo.style.display = 'flex';
+            mainNav.classList.add('hidden');
+            welcomeMessage.textContent = `Hai, ${user.username}!`;
+            showMainMateriView();
+            renderCards();
+        }
+        
+        function showMainMateriView() {
+            articleView.classList.add('hidden');
+            mainMateriView.classList.remove('hidden');
+        }
+        
+        async function showArticleView(articleId) {
+            const article = materiData.find(m => m.id === articleId);
+            if (!article) return;
+            mainMateriView.classList.add('hidden');
+            articleView.classList.remove('hidden');
+            window.scrollTo(0, 0);
+
+            const categoryEl = document.getElementById('article-category');
+            const titleEl = document.getElementById('article-title');
+            const contentEl = document.getElementById('article-content');
+            
+            categoryEl.textContent = article.category === 'AI' ? 'Kecerdasan Buatan' : 'Keuangan';
+            titleEl.textContent = article.title;
+            contentEl.innerHTML = '<div class="flex justify-center p-8"><span class="loader"></span></div>';
+            
+            const prompt = `Buatkan artikel lengkap tentang topik "${article.title}". Jelaskan konsep-konsep kunci berdasarkan deskripsi singkat ini: "${article.description}".`;
+            const generatedContent = await callGeminiAPI(prompt, "tutor");
+            
+            const formattedContent = generatedContent
+                .split('\n')
+                .map(line => {
+                    if (line.startsWith('### ')) return `<h3>${line.substring(4)}</h3>`;
+                    if (line.trim() === '') return '';
+                    if (line.startsWith('* ') || line.startsWith('- ')) return `<ul><li>${line.substring(2)}</li></ul>`;
+                    return `<p>${line}</p>`;
+                }).join('').replace(/<\/ul><ul>/g, '');
+            contentEl.innerHTML = formattedContent;
+        }
+
+        // --- AUTHENTICATION ---
+        const openModal = (modal) => { modalBackdrop.classList.remove('hidden'); modal.classList.remove('hidden'); };
+        const closeModals = () => { modalBackdrop.classList.add('hidden'); loginModal.classList.add('hidden'); registerModal.classList.add('hidden'); };
+
+        loginBtn.addEventListener('click', () => openModal(loginModal));
+        registerBtn.addEventListener('click', () => openModal(registerModal));
+        modalBackdrop.addEventListener('click', closeModals);
+
+        registerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('register-username').value;
+            const password = document.getElementById('register-password').value;
+            let users = JSON.parse(localStorage.getItem(USERS_KEY)) || [];
+            if (users.find(u => u.username === username)) {
+                showToast('Username sudah digunakan.', true); return;
+            }
+            users.push({ username, password });
+            localStorage.setItem(USERS_KEY, JSON.stringify(users));
+            registerForm.reset();
+            handleLoginSuccess({ username });
+            showToast('Pendaftaran berhasil!');
+        });
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            let users = JSON.parse(localStorage.getItem(USERS_KEY)) || [];
+            const user = users.find(u => u.username === username && u.password === password);
+            if (user) {
+                handleLoginSuccess(user);
+            } else {
+                showToast('Username atau password salah.', true);
+            }
+        });
+        
+        function handleLoginSuccess(user) {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
+            closeModals();
+            playSuccessSound();
+            showToast(`Selamat datang, ${user.username}!`);
+            showHomeView(user);
+        }
+
+        logoutBtn.addEventListener('click', () => {
+            sessionStorage.removeItem(SESSION_KEY);
+            showLandingPageView();
+        });
+        
+        function checkInitialState() {
+            const session = sessionStorage.getItem(SESSION_KEY);
+            if (session) {
+                showHomeView(JSON.parse(session));
+            } else {
+                showLandingPageView();
+            }
+        }
+        
+        // --- UI & UTILITIES ---
+        let audioCtx;
+        function playSuccessSound() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.5);
+        }
+
+        function showToast(message, isError = false) {
+            toastEl.textContent = message;
+            toastEl.className = `fixed top-5 right-5 text-white px-6 py-3 rounded-lg shadow-lg transition-all duration-300 ${isError ? 'bg-red-500' : 'bg-cyan-500'}`;
+            if(isError) {
+                 toastEl.style.color = 'white';
+            } else {
+                 toastEl.style.color = 'black';
+            }
+            toastEl.classList.remove('opacity-0', '-translate-y-12');
+            setTimeout(() => {
+                toastEl.classList.add('opacity-0', '-translate-y-12');
+            }, 3000);
+        }
+
+        // --- CHATBOT LOGIC ---
+        function toggleChatbot() {
+            isChatbotOpen = !isChatbotOpen;
+            chatbotWindow.classList.toggle('hidden');
+            if (isChatbotOpen && chatHistory.length === 0) {
+                // First time opening
+                const welcomeMessage = "Halo! Saya asisten AI BelajarYuk. Ada yang bisa saya bantu terkait materi AI atau Keuangan?";
+                chatHistory.push({ role: 'bot', text: welcomeMessage });
+                renderChatHistory();
+            }
+        }
+
+        function renderChatHistory() {
+            chatBody.innerHTML = '';
+            chatHistory.forEach(message => {
+                const messageEl = document.createElement('div');
+                messageEl.classList.add('mb-4', 'max-w-[85%]');
+                if (message.role === 'user') {
+                    messageEl.classList.add('self-end', 'bg-cyan-500', 'text-black', 'rounded-l-lg', 'rounded-br-lg', 'p-3', 'ml-auto');
+                } else {
+                    messageEl.classList.add('self-start', 'bg-gray-700', 'text-white', 'rounded-r-lg', 'rounded-bl-lg', 'p-3');
+                }
+                messageEl.textContent = message.text;
+                chatBody.appendChild(messageEl);
+            });
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+        
+        async function handleChatSubmit(e) {
+            e.preventDefault();
+            const userInput = chatInput.value.trim();
+            if (!userInput) return;
+
+            chatHistory.push({ role: 'user', text: userInput });
+            renderChatHistory();
+            chatInput.value = '';
+            typingIndicator.classList.remove('hidden');
+
+            const aiResponse = await callGeminiAPI(userInput, 'chatbot');
+            
+            chatHistory.push({ role: 'bot', text: aiResponse });
+            typingIndicator.classList.add('hidden');
+            renderChatHistory();
+        }
+        
+        chatbotToggle.addEventListener('click', toggleChatbot);
+        closeChatbotBtn.addEventListener('click', toggleChatbot);
+        chatForm.addEventListener('submit', handleChatSubmit);
+
+
+        // --- MATERI RENDERING ---
+        function renderCards(filter = 'all') {
+             materiGrid.innerHTML = '';
+            const filteredData = filter === 'all' ? materiData : materiData.filter(m => m.category === filter);
+            filteredData.forEach((materi, index) => {
+                materiGrid.innerHTML += `
+                <div class="glass-card rounded-2xl flex flex-col overflow-hidden p-6 animate-fade-in" style="animation-delay: ${index * 100}ms">
+                    <div class="flex justify-between items-start mb-3">
+                        <span class="text-sm font-semibold ${materi.category === 'AI' ? 'text-purple-400' : 'text-blue-400'}">${materi.category === 'AI' ? 'Kecerdasan Buatan' : 'Keuangan'}</span>
+                        <span class="ai-label">Dibuat oleh AI</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-2 flex-grow">${materi.title}</h3>
+                    <p class="text-gray-400 text-sm mb-4">${materi.description}</p>
+                    <a href="#" class="start-learning-btn mt-auto w-full text-center bg-gray-700/50 hover:bg-cyan-600 hover:text-black text-white font-semibold py-2 rounded-lg text-sm" data-id="${materi.id}">Mulai Belajar</a>
+                </div>`;
+            });
+        }
+        
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            document.querySelector('.filter-btn.active').classList.remove('active', 'bg-cyan-500', 'text-black');
+            e.target.classList.add('active', 'bg-cyan-500', 'text-black');
+            renderCards(e.target.dataset.filter);
+        }));
+
+        materiGrid.addEventListener('click', (e) => {
+            const target = e.target.closest('.start-learning-btn');
+            if (target) {
+                e.preventDefault();
+                showArticleView(parseInt(target.dataset.id));
+            }
+        });
+        
+        document.getElementById('back-to-main').addEventListener('click', showMainMateriView);
+
+        // --- LANDING PAGE BUTTONS ---
+        // Event delegation for course preview buttons
+        document.getElementById('kursus').addEventListener('click', (e) => {
+            const target = e.target.closest('.learn-more-btn, #see-all-courses-btn');
+            if (target) {
+                e.preventDefault();
+                openModal(registerModal); // Open register modal
+            }
+        });
+
+        // --- GEMINI API CALL ---
+        async function callGeminiAPI(prompt, persona = "assistant") {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            let systemPrompt = "Anda adalah asisten AI yang ramah dan membantu.";
+            if (persona === "tutor") {
+                systemPrompt = "Anda adalah seorang tutor ahli di platform BelajarYuk. Buatlah artikel yang mendalam, terstruktur, dan mudah dipahami dalam Bahasa Indonesia. Gunakan sub-judul (diawali '### '), paragraf, dan daftar (diawali '* ') untuk memformat konten.";
+            } else if (persona === "chatbot") {
+                systemPrompt = "Anda adalah asisten AI dari BelajarYuk. Jawab pertanyaan pengguna dengan ramah, informatif, dan ringkas terkait topik pembelajaran di platform, terutama seputar Kecerdasan Buatan (AI) dan Keuangan (Finance). Bertindaklah sebagai pemandu yang membantu.";
+            }
+            const payload = {
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                contents: [{ parts: [{ text: prompt }] }]
+            };
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const result = await response.json();
+                return result.candidates?.[0]?.content?.parts?.[0]?.text || "Konten tidak tersedia.";
+            } catch (error) {
+                console.error("Gemini API call failed:", error);
+                return "Maaf, terjadi kesalahan saat memuat materi.";
+            }
+        }
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            checkInitialState();
+            // Init Three.js bg
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            const particlesGeometry = new THREE.BufferGeometry;
+            const particlesCount = 5000;
+            const posArray = new Float32Array(particlesCount * 3);
+            for(let i = 0; i < particlesCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 10;
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const particlesMaterial = new THREE.PointsMaterial({ size: 0.005, color: 0x00F2DE });
+            const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(particlesMesh);
+            camera.position.z = 5;
+            function animate() { requestAnimationFrame(animate); particlesMesh.rotation.y += 0.0002; renderer.render(scene, camera); }
+            animate();
+        });
+        
+        document.getElementById('header-logo').addEventListener('click', (e) => {
+            e.preventDefault();
+            checkInitialState();
+        });
+    </script>
+</body>
+</html>
